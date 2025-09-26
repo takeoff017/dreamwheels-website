@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DreamWheels Admin Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0a0e17;
+    color: #e6ecf8;
+    margin: 0; padding: 0;
+}
+.container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+h1, h2 { color: #7c5cff; }
+button { cursor: pointer; margin-top: 5px; padding: 8px 12px; border-radius: 6px; border: none; }
+button.primary { background: #7c5cff; color: white; }
+button.danger { background: #ff2e63; color: white; }
+input, textarea { padding: 8px; width: 100%; margin-bottom: 10px; border-radius: 6px; border: 1px solid #555; background: #111; color: white; }
+section { margin-bottom: 50px; }
+.hidden { display: none; }
+.card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+.card h3 { margin: 0 0 5px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DreamWheels Admin Panel</h1>
+
+    <!-- Login Section -->
+    <section id="loginSection">
+        <h2>Admin Login</h2>
+        <input type="text" id="adminUsername" placeholder="Username">
+        <input type="password" id="adminPassword" placeholder="Password">
+        <button id="loginBtn" class="primary">Login</button>
+        <p id="loginMessage"></p>
+    </section>
+
+    <!-- Admin Content -->
+    <section id="adminContent" class="hidden">
+        <h2>Manage Listings</h2>
+        <div id="listingsContainer"></div>
+        <h3>Add New Listing</h3>
+        <input type="text" id="newCarName" placeholder="Car Name">
+        <input type="number" id="newCarPrice" placeholder="Price">
+        <input type="text" id="newCarImage" placeholder="Image URL">
+        <input type="text" id="newCarBadge" placeholder="Badge (e.g., Auction Grade A)">
+        <input type="number" id="newCarYear" placeholder="Year">
+        <input type="text" id="newCarMileage" placeholder="Mileage">
+        <input type="text" id="newCarLocation" placeholder="Location">
+        <button id="addListingBtn" class="primary">Add Listing</button>
+
+        <hr>
+
+        <h2>Manage Reviews</h2>
+        <div id="reviewsContainer"></div>
+        <h3>Add New Review</h3>
+        <input type="text" id="newReviewName" placeholder="Name">
+        <input type="text" id="newReviewLocation" placeholder="Location">
+        <input type="number" id="newReviewRating" placeholder="Rating (1-5)">
+        <textarea id="newReviewText" placeholder="Review Text"></textarea>
+        <input type="text" id="newReviewAvatar" placeholder="Avatar URL">
+        <button id="addReviewBtn" class="primary">Add Review</button>
+
+        <hr>
+
+        <h2>Manage Messages</h2>
+        <div id="messagesContainer"></div>
+    </section>
+</div>
+
+<script>
+// --- Admin Login ---
+const loginSection = document.getElementById('loginSection');
+const adminContent = document.getElementById('adminContent');
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const username = document.getElementById('adminUsername').value;
+    const password = document.getElementById('adminPassword').value;
+    const loginMessage = document.getElementById('loginMessage');
+
+    try {
+        const res = await fetch('http://localhost:3000/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if(res.ok) {
+            localStorage.setItem('adminToken', data.token);
+            loginSection.classList.add('hidden');
+            adminContent.classList.remove('hidden');
+            fetchListings();
+            fetchReviews();
+            fetchMessages();
+        } else {
+            loginMessage.innerText = data.message;
+        }
+    } catch(err) {
+        console.error(err);
+        loginMessage.innerText = 'Login failed';
+    }
+});
+
+// --- Fetch Listings ---
+async function fetchListings() {
+    const token = localStorage.getItem('adminToken');
+    const res = await fetch('http://localhost:3000/listings', {
+        headers: { 'Authorization': token }
+    });
+    const listings = await res.json();
+    const container = document.getElementById('listingsContainer');
+    container.innerHTML = '';
+    listings.forEach(listing => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+            <h3>${listing.name} - $${listing.price}</h3>
+            <p>${listing.badge} | ${listing.year} | ${listing.mileage} | ${listing.location}</p>
+            <button class="danger" onclick="deleteListing(${listing.id})">Delete</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// --- Add Listing ---
+document.getElementById('addListingBtn').addEventListener('click', async () => {
+    const token = localStorage.getItem('adminToken');
+    const newListing = {
+        name: document.getElementById('newCarName').value,
+        price: Number(document.getElementById('newCarPrice').value),
+        image: document.getElementById('newCarImage').value,
+        badge: document.getElementById('newCarBadge').value,
+        details: {
+            year: Number(document.getElementById('newCarYear').value),
+            mileage: document.getElementById('newCarMileage').value,
+            location: document.getElementById('newCarLocation').value
+        }
+    };
+
+    await fetch('http://localhost:3000/listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': token },
+        body: JSON.stringify(newListing)
+    });
+    fetchListings();
+});
+
+// --- Delete Listing ---
+async function deleteListing(id) {
+    const token = localStorage.getItem('adminToken');
+    await fetch(`http://localhost:3000/listings/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': token }
+    });
+    fetchListings();
+}
+
+// --- Fetch Reviews ---
+async function fetchReviews() {
+    const token = localStorage.getItem('adminToken');
+    const res = await fetch('http://localhost:3000/reviews', {
+        headers: { 'Authorization': token }
+    });
+    const reviews = await res.json();
+    const container = document.getElementById('reviewsContainer');
+    container.innerHTML = '';
+    reviews.forEach(review => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+            <h3>${review.name} (${review.rating}⭐)</h3>
+            <p>${review.location}</p>
+            <p>${review.text}</p>
+            <button class="danger" onclick="deleteReview(${review.id})">Delete</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// --- Add Review ---
+document.getElementById('addReviewBtn').addEventListener('click', async () => {
+    const token = localStorage.getItem('adminToken');
+    const newReview = {
+        name: document.getElementById('newReviewName').value,
+        location: document.getElementById('newReviewLocation').value,
+        rating: Number(document.getElementById('newReviewRating').value),
+        text: document.getElementById('newReviewText').value,
+        avatar: document.getElementById('newReviewAvatar').value
+    };
+
+    await fetch('http://localhost:3000/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': token },
+        body: JSON.stringify(newReview)
+    });
+    fetchReviews();
+});
+
+// --- Delete Review ---
+async function deleteReview(id) {
+    const token = localStorage.getItem('adminToken');
+    await fetch(`http://localhost:3000/reviews/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': token }
+    });
+    fetchReviews();
+}
+
+// --- Fetch Messages ---
+async function fetchMessages() {
+    const token = localStorage.getItem('adminToken');
+    const res = await fetch('http://localhost:3000/messages', {
+        headers: { 'Authorization': token }
+    });
+    const messages = await res.json();
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = '';
+    messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+            <h3>From: ${msg.name} (${msg.email})</h3>
+            <p>${msg.message}</p>
+            <button class="primary" onclick="replyMessage('${msg.email}')">Reply</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// --- Reply to Message ---
+function replyMessage(email) {
+    const reply = prompt(`Reply to ${email}:`);
+    if(reply) alert(`This is a demo: reply sent to ${email}:\n\n${reply}`);
+}
+</script>
+
+</body>
+</html>
